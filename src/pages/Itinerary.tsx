@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+
 import MapComponent from "@/components/MapComponent";
 import ChatWidget from "@/components/ChatWidget";
 
@@ -87,6 +89,89 @@ export default function Itinerary() {
   const [shareUrl, setShareUrl] = useState<string>('');
   const [isChatOpen, setIsChatOpen] = useState(false);
   const { toast } = useToast();
+
+  const [pickingOnMap, setPickingOnMap] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newTime, setNewTime] = useState("10:00");
+  const [newLocation, setNewLocation] = useState("");
+  const [newCoords, setNewCoords] = useState<[number, number] | null>(null);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [isGenerateOpen, setIsGenerateOpen] = useState(false);
+  const [generateDays, setGenerateDays] = useState<number>(3);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        setUserLocation([pos.coords.latitude, pos.coords.longitude]);
+      });
+    }
+  }, []);
+
+  const handleMapSelect = (coords: [number, number]) => {
+    setNewCoords(coords);
+    setPickingOnMap(false);
+    toast({
+      title: "Location selected",
+      description: `${coords[0].toFixed(5)}, ${coords[1].toFixed(5)}`
+    });
+  };
+
+  const addActivity = () => {
+    const id = Date.now().toString();
+    const coords = newCoords ?? [-20.348404, 57.552152];
+    const item: ItineraryItem = {
+      id,
+      day: selectedDay,
+      title: newTitle || 'New Activity',
+      description: newDescription || '',
+      time: newTime || '10:00',
+      location: newLocation || 'Custom location',
+      coordinates: coords,
+      isLocked: false,
+      category: 'activity'
+    };
+    setItinerary((prev) => [...prev, item]);
+    setNewTitle("");
+    setNewDescription("");
+    setNewTime("10:00");
+    setNewLocation("");
+    setNewCoords(null);
+    toast({ title: "Activity added", description: `Added to day ${selectedDay}` });
+  };
+
+  const handleGeneratePlan = () => {
+    const daysNum = Math.max(1, Math.min(30, Number(generateDays) || 1));
+    const generated: ItineraryItem[] = [];
+    for (let d = 1; d <= daysNum; d++) {
+      generated.push({
+        id: `${Date.now()}-${d}-1`,
+        day: d,
+        title: `Morning exploration Day ${d}`,
+        description: 'Auto-generated activity',
+        time: '09:00',
+        location: 'Mauritius',
+        coordinates: [-20.348404, 57.552152],
+        isLocked: false,
+        category: 'activity'
+      });
+      generated.push({
+        id: `${Date.now()}-${d}-2`,
+        day: d,
+        title: `Local lunch Day ${d}`,
+        description: 'Taste Mauritian cuisine',
+        time: '13:00',
+        location: 'Local Restaurant',
+        coordinates: [-20.348404, 57.552152],
+        isLocked: false,
+        category: 'meal'
+      });
+    }
+    setItinerary(generated);
+    setSelectedDay(1);
+    setIsGenerateOpen(false);
+    toast({ title: 'Plan generated', description: `${daysNum} days added.` });
+  };
 
   const days = Array.from(new Set(itinerary.map(item => item.day))).sort();
   const filteredItinerary = itinerary.filter(item => item.day === selectedDay);
@@ -169,9 +254,9 @@ export default function Itinerary() {
           </div>
           
           <div className="flex flex-wrap gap-2">
-            <Button onClick={planRescue} variant="outline" className="bg-white/80">
+            <Button onClick={() => setIsGenerateOpen(true)} variant="outline" className="bg-white/80">
               <RefreshCw className="h-4 w-4 mr-2" />
-              Plan-Rescue
+              Generate Plan
             </Button>
             <Button onClick={generateShareLink} variant="outline" className="bg-white/80">
               <Share2 className="h-4 w-4 mr-2" />
@@ -184,20 +269,54 @@ export default function Itinerary() {
           </div>
         </div>
 
+        {/* Generate Plan Dialog */}
+        <Dialog open={isGenerateOpen} onOpenChange={setIsGenerateOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Generate Trip Plan</DialogTitle>
+              <DialogDescription>Choose how many days to generate. Existing itinerary will be replaced.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-ocean-deep">Number of days</label>
+                <Input type="number" min={1} max={30} value={generateDays}
+                  onChange={(e) => setGenerateDays(Number(e.target.value))} />
+              </div>
+              <Button className="bg-gradient-tropical w-full" onClick={handleGeneratePlan}>Generate</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Day Selector */}
-        <div className="flex flex-wrap gap-2">
-          {days.map(day => (
-            <Button
-              key={day}
-              variant={selectedDay === day ? "default" : "outline"}
-              onClick={() => setSelectedDay(day)}
-              className={selectedDay === day ? "bg-gradient-tropical" : "bg-white/80"}
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Day {day}
-            </Button>
-          ))}
-        </div>
+        {days.length > 6 ? (
+          <div className="w-full max-w-xs">
+            <Select value={String(selectedDay)} onValueChange={(v) => setSelectedDay(Number(v))}>
+              <SelectTrigger className="bg-white/80">
+                <SelectValue placeholder="Select day" />
+              </SelectTrigger>
+              <SelectContent>
+                {days.map((day) => (
+                  <SelectItem key={day} value={String(day)}>Day {day}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {days.map(day => (
+              <Button
+                key={day}
+                variant={selectedDay === day ? "default" : "outline"}
+                onClick={() => setSelectedDay(day)}
+                className={selectedDay === day ? "bg-gradient-tropical" : "bg-white/80"}
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Day {day}
+              </Button>
+            ))}
+          </div>
+        )}
+
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Timeline */}
@@ -281,11 +400,17 @@ export default function Itinerary() {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
-                    <Input placeholder="Activity title" />
-                    <Textarea placeholder="Description" />
-                    <Input type="time" />
-                    <Input placeholder="Location" />
-                    <Button className="w-full bg-gradient-tropical">Add Activity</Button>
+                    <Input placeholder="Activity title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+                    <Textarea placeholder="Description" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
+                    <Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
+                    <Input placeholder="Location (name/address)" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} />
+                    <div className="text-sm text-muted-foreground">
+                      Coordinates: {newCoords ? `${newCoords[0].toFixed(5)}, ${newCoords[1].toFixed(5)}` : 'Not set'}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => setPickingOnMap(true)}>Pick on Map</Button>
+                      <Button className="bg-gradient-tropical flex-1" onClick={addActivity}>Add Activity</Button>
+                    </div>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -305,7 +430,12 @@ export default function Itinerary() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="h-[500px] rounded-b-lg overflow-hidden">
-                <MapComponent items={filteredItinerary} />
+                <MapComponent 
+                  items={filteredItinerary}
+                  showDirections={true}
+                  userLocation={userLocation ?? undefined}
+                  onSelectLocation={pickingOnMap ? handleMapSelect : undefined}
+                />
               </div>
             </CardContent>
           </Card>
@@ -314,14 +444,15 @@ export default function Itinerary() {
         {/* Share URL Display */}
         {shareUrl && (
           <Card className="bg-white/90 backdrop-blur-sm shadow-soft">
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 space-y-3">
               <div className="flex items-center gap-3">
                 <Share2 className="h-5 w-5 text-primary" />
                 <Input value={shareUrl} readOnly className="flex-1" />
-                <Button onClick={() => navigator.clipboard.writeText(shareUrl)}>
-                  Copy
-                </Button>
+                <Button onClick={() => navigator.clipboard.writeText(shareUrl)}>Copy</Button>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Anyone with this link can view your itinerary in read-only mode. To let others edit, share your screen or copy the plan into their app.
+              </p>
             </CardContent>
           </Card>
         )}

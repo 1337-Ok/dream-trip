@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-routing-machine';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 
 // Fix for default markers
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -22,13 +24,19 @@ interface ItineraryItem {
 
 interface MapComponentProps {
   items: ItineraryItem[];
+  showDirections?: boolean;
+  userLocation?: [number, number];
+  onSelectLocation?: (coords: [number, number]) => void;
 }
 
-export default function MapComponent({ items }: MapComponentProps) {
+
+export default function MapComponent({ items, showDirections, userLocation, onSelectLocation }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
+  const routingControlRef = useRef<any>(null);
+  const selectionMarkerRef = useRef<L.Marker | null>(null);
 
-  useEffect(() => {
+useEffect(() => {
     if (!mapRef.current) return;
 
     // Initialize map if it doesn't exist
@@ -42,12 +50,37 @@ export default function MapComponent({ items }: MapComponentProps) {
 
     const map = mapInstanceRef.current;
 
-    // Clear existing markers
+    // Remove existing routing control if any
+    if (routingControlRef.current) {
+      try {
+        map?.removeControl(routingControlRef.current);
+      } catch (e) {
+        // ignore
+      }
+      routingControlRef.current = null;
+    }
+
+    // Clear existing markers (keep tiles and other layers)
     map.eachLayer((layer) => {
       if (layer instanceof L.Marker) {
         map.removeLayer(layer);
       }
     });
+
+    // Map click to select a location
+    let clickHandler: any = null;
+    if (onSelectLocation) {
+      clickHandler = (e: any) => {
+        const coords: [number, number] = [e.latlng.lat, e.latlng.lng];
+        if (selectionMarkerRef.current) {
+          selectionMarkerRef.current.setLatLng(e.latlng);
+        } else {
+          selectionMarkerRef.current = L.marker(coords).addTo(map);
+        }
+        onSelectLocation(coords);
+      };
+      map.on('click', clickHandler);
+    }
 
     // Add markers for each item
     const markers: L.Marker[] = [];
@@ -57,19 +90,12 @@ export default function MapComponent({ items }: MapComponentProps) {
         meal: '#ea580c',
         transport: '#059669',
         accommodation: '#7c3aed'
-      };
-
-      const categoryIcons = {
-        activity: '🏃‍♂️',
-        meal: '🍽️',
-        transport: '🚗',
-        accommodation: '🏨'
-      };
+      } as const;
 
       const customIcon = L.divIcon({
         html: `
           <div style="
-            background-color: ${categoryColors[item.category]};
+            background-color: ${'${'}categoryColors[item.category]{'}'};
             color: white;
             border-radius: 50%;
             width: 30px;
@@ -82,7 +108,7 @@ export default function MapComponent({ items }: MapComponentProps) {
             border: 2px solid white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
           ">
-            ${index + 1}
+            ${'${'}index + 1{'}'}
           </div>
         `,
         className: 'custom-marker',
@@ -94,13 +120,12 @@ export default function MapComponent({ items }: MapComponentProps) {
         .bindPopup(`
           <div style="min-width: 200px;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-              <span style="font-size: 16px;">${categoryIcons[item.category]}</span>
-              <strong style="color: ${categoryColors[item.category]};">${item.time}</strong>
+              <strong style="color: ${'${'}categoryColors[item.category]{'}'};">${'${'}item.time{'}'}</strong>
             </div>
-            <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold;">${item.title}</h3>
-            <p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">${item.description}</p>
+            <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold;">${'${'}item.title{'}'}</h3>
+            <p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">${'${'}item.description{'}'}</p>
             <div style="display: flex; align-items: center; gap: 4px; color: #888; font-size: 12px;">
-              📍 ${item.location}
+              📍 ${'${'}item.location{'}'}
             </div>
           </div>
         `)
@@ -115,14 +140,46 @@ export default function MapComponent({ items }: MapComponentProps) {
       map.fitBounds(group.getBounds().pad(0.1));
     }
 
+    // Draw directions from user location through the day's waypoints
+    if (showDirections && userLocation) {
+      const waypoints = [
+        L.latLng(userLocation[0], userLocation[1]),
+        ...items.map((it) => L.latLng(it.coordinates[0], it.coordinates[1]))
+      ];
+
+      if (waypoints.length >= 2) {
+        const routingControl = (L as any).Routing.control({
+          waypoints,
+          routeWhileDragging: false,
+          addWaypoints: false,
+          draggableWaypoints: false,
+          show: false,
+          createMarker: () => null,
+        }).addTo(map);
+        routingControlRef.current = routingControl;
+      }
+    }
+
     // Cleanup function
     return () => {
+      if (clickHandler) {
+        map.off('click', clickHandler);
+      }
+      if (routingControlRef.current) {
+        try {
+          map.removeControl(routingControlRef.current);
+        } catch (e) {
+          // ignore
+        }
+        routingControlRef.current = null;
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
     };
-  }, [items]);
+  }, [items, showDirections, userLocation, onSelectLocation]);
+
 
   return (
     <div 

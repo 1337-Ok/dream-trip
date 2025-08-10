@@ -268,11 +268,11 @@ export default function LocalInfo() {
                     </div>
                     Important Locations
                     <Badge variant="secondary" className="ml-auto">
-                      Key Places
+                      Nearby + Key Places
                     </Badge>
                   </CardTitle>
                   <CardDescription className="text-left">
-                    Important addresses and contact information
+                    Important addresses and contact information. If you enable location, we’ll show nearby options first.
                   </CardDescription>
                 </CardHeader>
               </AccordionTrigger>
