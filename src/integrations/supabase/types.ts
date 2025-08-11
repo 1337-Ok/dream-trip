@@ -14,7 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      mauritius_activities: {
+        Row: {
+          best_time_of_day: string | null
+          category: string
+          coordinates: number[]
+          cost_estimate_usd: number | null
+          created_at: string
+          description: string | null
+          difficulty_level: string | null
+          estimated_duration_hours: number | null
+          id: string
+          location: string
+          recommended_group_size: string | null
+          tags: string[] | null
+          title: string
+        }
+        Insert: {
+          best_time_of_day?: string | null
+          category: string
+          coordinates: number[]
+          cost_estimate_usd?: number | null
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          estimated_duration_hours?: number | null
+          id?: string
+          location: string
+          recommended_group_size?: string | null
+          tags?: string[] | null
+          title: string
+        }
+        Update: {
+          best_time_of_day?: string | null
+          category?: string
+          coordinates?: number[]
+          cost_estimate_usd?: number | null
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          estimated_duration_hours?: number | null
+          id?: string
+          location?: string
+          recommended_group_size?: string | null
+          tags?: string[] | null
+          title?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          ai_interactions: Json | null
+          created_at: string
+          id: string
+          preferences_analysis: string | null
+          trip_data: Json | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          ai_interactions?: Json | null
+          created_at?: string
+          id?: string
+          preferences_analysis?: string | null
+          trip_data?: Json | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          ai_interactions?: Json | null
+          created_at?: string
+          id?: string
+          preferences_analysis?: string | null
+          trip_data?: Json | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
