@@ -35,6 +35,9 @@ export default function MapComponent({ items, showDirections, userLocation, onSe
   const mapInstanceRef = useRef<L.Map | null>(null);
   const routingControlRef = useRef<any>(null);
   const selectionMarkerRef = useRef<L.Marker | null>(null);
+  const routeOriginRef = useRef<L.LatLng | null>(null);
+  const routeDestRef = useRef<L.LatLng | null>(null);
+  const contextPopupRef = useRef<L.Popup | null>(null);
 
 useEffect(() => {
     if (!mapRef.current) return;
@@ -85,17 +88,17 @@ useEffect(() => {
     // Add markers for each item
     const markers: L.Marker[] = [];
     items.forEach((item, index) => {
-      const categoryColors = {
-        activity: '#1e40af',
-        meal: '#ea580c',
-        transport: '#059669',
-        accommodation: '#7c3aed'
-      } as const;
+      const categoryColorVar: Record<ItineraryItem['category'], string> = {
+        activity: '--primary',
+        meal: '--secondary',
+        transport: '--palm-green',
+        accommodation: '--ocean-deep',
+      };
 
       const customIcon = L.divIcon({
         html: `
           <div style="
-            background-color: ${'${'}categoryColors[item.category]{'}'};
+            background-color: hsl(var(${categoryColorVar[item.category]}));
             color: white;
             border-radius: 50%;
             width: 30px;
@@ -108,7 +111,7 @@ useEffect(() => {
             border: 2px solid white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
           ">
-            ${'${'}index + 1{'}'}
+            ${index + 1}
           </div>
         `,
         className: 'custom-marker',
@@ -116,16 +119,17 @@ useEffect(() => {
         iconAnchor: [15, 15]
       });
 
+      const color = `hsl(var(${categoryColorVar[item.category]}))`;
       const marker = L.marker(item.coordinates, { icon: customIcon })
         .bindPopup(`
-          <div style="min-width: 200px;">
+          <div style="min-width: 220px;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-              <strong style="color: ${'${'}categoryColors[item.category]{'}'};">${'${'}item.time{'}'}</strong>
+              <strong style="color: ${color};">${item.time}</strong>
             </div>
-            <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold;">${'${'}item.title{'}'}</h3>
-            <p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">${'${'}item.description{'}'}</p>
+            <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold;">${item.title}</h3>
+            <p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">${item.description}</p>
             <div style="display: flex; align-items: center; gap: 4px; color: #888; font-size: 12px;">
-              📍 ${'${'}item.location{'}'}
+              📍 ${item.location}
             </div>
           </div>
         `)
@@ -140,8 +144,61 @@ useEffect(() => {
       map.fitBounds(group.getBounds().pad(0.1));
     }
 
-    // Draw directions from user location through the day's waypoints
-    if (showDirections && userLocation) {
+    // Right-click context menu for directions
+    const buildRoute = (from: L.LatLng, to: L.LatLng) => {
+      if (!map) return;
+      if (routingControlRef.current) {
+        try { map.removeControl(routingControlRef.current); } catch {}
+      }
+      const routingControl = (L as any).Routing.control({
+        waypoints: [from, to],
+        routeWhileDragging: false,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        show: false,
+        createMarker: () => null,
+      }).addTo(map);
+      routingControlRef.current = routingControl;
+    };
+
+    const contextHandler = (e: L.LeafletMouseEvent) => {
+      const container = L.DomUtil.create('div', 'leaflet-context-menu');
+      container.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <button id="dir-here" style="padding:6px 8px; border-radius:6px; background:hsl(var(--muted)); border:1px solid hsl(var(--border)); cursor:pointer;">Direction here</button>
+          <button id="dir-to" style="padding:6px 8px; border-radius:6px; background:hsl(var(--muted)); border:1px solid hsl(var(--border)); cursor:pointer;">Direction to</button>
+        </div>
+      `;
+      const popup = L.popup({ closeButton: true })
+        .setLatLng(e.latlng)
+        .setContent(container);
+      contextPopupRef.current = popup;
+      popup.openOn(map);
+
+      const fromBtn = container.querySelector('#dir-here') as HTMLButtonElement | null;
+      const toBtn = container.querySelector('#dir-to') as HTMLButtonElement | null;
+
+      fromBtn?.addEventListener('click', () => {
+        routeOriginRef.current = e.latlng;
+        if (routeDestRef.current) buildRoute(routeOriginRef.current, routeDestRef.current);
+        map.closePopup(popup);
+      });
+
+      toBtn?.addEventListener('click', () => {
+        routeDestRef.current = e.latlng;
+        // If no origin, default to user location if available
+        if (!routeOriginRef.current && userLocation) {
+          routeOriginRef.current = L.latLng(userLocation[0], userLocation[1]);
+        }
+        if (routeOriginRef.current) buildRoute(routeOriginRef.current, routeDestRef.current);
+        map.closePopup(popup);
+      });
+    };
+
+    map.on('contextmenu', contextHandler);
+
+    // Draw directions from user location through the day's waypoints (default)
+    if (!routeOriginRef.current && !routeDestRef.current && showDirections && userLocation) {
       const waypoints = [
         L.latLng(userLocation[0], userLocation[1]),
         ...items.map((it) => L.latLng(it.coordinates[0], it.coordinates[1]))
@@ -165,6 +222,7 @@ useEffect(() => {
       if (clickHandler) {
         map.off('click', clickHandler);
       }
+      map.off('contextmenu', contextHandler);
       if (routingControlRef.current) {
         try {
           map.removeControl(routingControlRef.current);

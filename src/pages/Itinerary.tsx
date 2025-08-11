@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
-import { Calendar, MapPin, Clock, Lock, Unlock, Share2, MessageCircle, RefreshCw, Plus } from "lucide-react";
+import { Calendar, MapPin, Clock, Lock, Unlock, Share2, MessageCircle, RefreshCw, Plus, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -100,6 +100,13 @@ export default function Itinerary() {
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [generateDays, setGenerateDays] = useState<number>(3);
 
+  const [editItem, setEditItem] = useState<ItineraryItem | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editTime, setEditTime] = useState("10:00");
+  const [editLocation, setEditLocation] = useState("");
+  const [editCoords, setEditCoords] = useState<[number, number] | null>(null);
+
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
@@ -108,8 +115,52 @@ export default function Itinerary() {
     }
   }, []);
 
+  // Sync days from Home tripData (start/end dates)
+  useEffect(() => {
+    const td = localStorage.getItem('tripData');
+    if (!td) return;
+    try {
+      const data = JSON.parse(td);
+      const { startDate, endDate } = data || {};
+      if (!startDate || !endDate) return;
+      const sd = new Date(startDate);
+      const ed = new Date(endDate);
+      if (isNaN(sd.getTime()) || isNaN(ed.getTime()) || ed < sd) return;
+      const MS_PER_DAY = 86400000;
+      const daysCount = Math.floor((ed.getTime() - sd.getTime()) / MS_PER_DAY) + 1;
+      setItinerary((prev) => {
+        const trimmed = prev.filter((it) => it.day <= daysCount);
+        const haveDays = new Set(trimmed.map((it) => it.day));
+        const additions: ItineraryItem[] = [];
+        for (let d = 1; d <= daysCount; d++) {
+          if (!haveDays.has(d)) {
+            additions.push({
+              id: `${Date.now()}-${d}-placeholder`,
+              day: d,
+              title: `Free time - Day ${d}`,
+              description: 'Add activities you love or let AI suggest them',
+              time: '10:00',
+              location: 'Mauritius',
+              coordinates: [-20.348404, 57.552152],
+              isLocked: false,
+              category: 'activity'
+            });
+          }
+        }
+        return [...trimmed, ...additions];
+      });
+      setSelectedDay(1);
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
   const handleMapSelect = (coords: [number, number]) => {
-    setNewCoords(coords);
+    if (editItem) {
+      setEditCoords(coords);
+    } else {
+      setNewCoords(coords);
+    }
     setPickingOnMap(false);
     toast({
       title: "Location selected",
@@ -366,14 +417,31 @@ export default function Itinerary() {
                                     {item.location}
                                   </div>
                                 </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => toggleLock(item.id)}
-                                  className="text-muted-foreground hover:text-ocean-deep"
-                                >
-                                  {item.isLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditItem(item);
+                                      setEditTitle(item.title);
+                                      setEditDescription(item.description);
+                                      setEditTime(item.time);
+                                      setEditLocation(item.location);
+                                      setEditCoords(item.coordinates);
+                                    }}
+                                    className="text-muted-foreground hover:text-ocean-deep"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => toggleLock(item.id)}
+                                    className="text-muted-foreground hover:text-ocean-deep"
+                                  >
+                                    {item.isLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           )}
