@@ -155,6 +155,12 @@ export default function Itinerary() {
     }
   }, []);
 
+  // Sync itinerary and selected day to localStorage for AI assistant context
+  useEffect(() => {
+    localStorage.setItem('itinerary', JSON.stringify(itinerary));
+    localStorage.setItem('selectedDay', selectedDay.toString());
+  }, [itinerary, selectedDay]);
+
   const handleMapSelect = (coords: [number, number]) => {
     if (editItem) {
       setEditCoords(coords);

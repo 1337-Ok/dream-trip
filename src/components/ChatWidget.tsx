@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X, Send, MessageCircle, Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,7 +38,7 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
     "Weather recommendations"
   ];
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputText.trim()) return;
 
     const userMessage: Message = {
@@ -48,33 +49,80 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputText;
     setInputText('');
 
-    // Simulate AI response
-    setTimeout(() => {
+    // Add loading message
+    const loadingMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      text: "Let me analyze your itinerary and find the best recommendations...",
+      sender: 'ai',
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, loadingMessage]);
+
+    try {
+      // Get context data
+      const storedItinerary = localStorage.getItem('itinerary');
+      const storedTripData = localStorage.getItem('tripData');
+      const storedSelectedDay = localStorage.getItem('selectedDay');
+      
+      const itinerary = storedItinerary ? JSON.parse(storedItinerary) : null;
+      const tripData = storedTripData ? JSON.parse(storedTripData) : null;
+      const selectedDay = storedSelectedDay ? parseInt(storedSelectedDay) : null;
+
+      // Call our travel assistant API
+      const { data, error } = await supabase.functions.invoke('travel-assistant', {
+        body: {
+          message: currentInput,
+          itinerary,
+          tripData,
+          selectedDay,
+          userLocation: null // TODO: Add geolocation if needed
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Replace loading message with AI response
       const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        text: "Thanks for your question! I'm analyzing your itinerary and local recommendations. Here are some suggestions based on your travel style and preferences...",
+        id: (Date.now() + 2).toString(),
+        text: data.response || "I couldn't process your request right now. Please try again.",
         sender: 'ai',
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, aiResponse]);
-    }, 1000);
+
+      setMessages(prev => prev.map(msg => 
+        msg.id === loadingMessage.id ? aiResponse : msg
+      ));
+
+    } catch (error) {
+      console.error('AI Assistant Error:', error);
+      
+      // Replace loading message with error response
+      const errorMessage: Message = {
+        id: (Date.now() + 2).toString(),
+        text: "I'm having trouble connecting right now. Please try asking something like 'What should I do today?' or 'Suggest nearby restaurants'.",
+        sender: 'ai',
+        timestamp: new Date()
+      };
+
+      setMessages(prev => prev.map(msg => 
+        msg.id === loadingMessage.id ? errorMessage : msg
+      ));
+    }
   };
 
   const handleSuggestionClick = (suggestion: string) => {
     setInputText(suggestion);
+    // Auto-send the suggestion
+    setTimeout(() => handleSendMessage(), 100);
   };
 
   if (!isOpen) {
-    return (
-      <Button
-        onClick={() => {}}
-        className="fixed bottom-6 right-6 z-50 bg-gradient-tropical shadow-tropical animate-glow rounded-full w-14 h-14 p-0"
-      >
-        <MessageCircle className="h-6 w-6" />
-      </Button>
-    );
+    return null; // Chat button should be handled by parent component
   }
 
   return (
