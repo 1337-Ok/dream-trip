@@ -31,8 +31,8 @@ serve(async (req) => {
     }
 
     const supabaseUrl = "https://ypzuaazojbnliaacscpw.supabase.co";
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
-    const supabase = createClient(supabaseUrl, supabaseKey!);
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlwenVhYXpvamJubGlhYWNzY3B3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMzkzMjksImV4cCI6MjA2OTkxNTMyOX0.l1SnanchlW6tDf56YJAGpFCqs6unlRmmj1ZaUCwzNJM";
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { 
       message, 
