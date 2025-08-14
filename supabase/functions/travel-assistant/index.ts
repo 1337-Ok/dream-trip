@@ -37,7 +37,7 @@ interface SearchResult {
 
 // Enhanced web search with Tavily AI
 async function searchWithTavily(query: string, location: string = "Mauritius"): Promise<SearchResult[]> {
-  const tavilyApiKey = Deno.env.get('Tavily AI Search API');
+  const tavilyApiKey = Deno.env.get('TAVILY_API_KEY');
   if (!tavilyApiKey) {
     console.log('Tavily API key not configured, skipping web search');
     return [];
@@ -504,10 +504,22 @@ Context: I'm currently ${selectedDay ? `planning Day ${selectedDay}` : 'reviewin
 
   } catch (error) {
     console.error('Enhanced Travel Assistant Error:', error);
+    
+    // Generate dynamic error response based on the error
+    let errorResponse = "I'm having some technical difficulties right now.";
+    
+    if (error.message.includes('OpenAI')) {
+      errorResponse = "I'm having trouble connecting to my AI brain. Let me try to help you with what I know about Mauritius!";
+    } else if (error.message.includes('API')) {
+      errorResponse = "Some of my data sources are temporarily unavailable, but I can still provide general travel advice for Mauritius.";
+    } else {
+      errorResponse = "I encountered an unexpected issue, but I'm still here to help with your Mauritius travel plans!";
+    }
+    
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        response: "I'm experiencing technical difficulties. Please try asking something simpler, like 'What's the weather like?' or 'Suggest activities for today'.",
+        response: errorResponse,
         success: false
       }),
       {

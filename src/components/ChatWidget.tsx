@@ -101,10 +101,18 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
     } catch (error) {
       console.error('AI Assistant Error:', error);
       
-      // Replace loading message with error response
+      // Generate dynamic error response
+      let errorText = "I'm having some connectivity issues, but I'm still here to help!";
+      
+      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        errorText = "I'm having trouble reaching my servers. Let me try again, or feel free to ask about Mauritius activities, restaurants, or planning tips!";
+      } else if (error.message?.includes('auth')) {
+        errorText = "There's an authentication issue on my end. I can still help with general Mauritius travel advice though!";
+      }
+      
       const errorMessage: Message = {
         id: (Date.now() + 2).toString(),
-        text: "I'm having trouble connecting right now. Please try asking something like 'What should I do today?' or 'Suggest nearby restaurants'.",
+        text: errorText,
         sender: 'ai',
         timestamp: new Date()
       };
