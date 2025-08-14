@@ -25,6 +25,7 @@ export type Database = {
           difficulty_level: string | null
           estimated_duration_hours: number | null
           id: string
+          image_url: string | null
           location: string
           recommended_group_size: string | null
           tags: string[] | null
@@ -40,6 +41,7 @@ export type Database = {
           difficulty_level?: string | null
           estimated_duration_hours?: number | null
           id?: string
+          image_url?: string | null
           location: string
           recommended_group_size?: string | null
           tags?: string[] | null
@@ -55,6 +57,7 @@ export type Database = {
           difficulty_level?: string | null
           estimated_duration_hours?: number | null
           id?: string
+          image_url?: string | null
           location?: string
           recommended_group_size?: string | null
           tags?: string[] | null
